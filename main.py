@@ -49,8 +49,7 @@ async def websocket_endpoint(websocket: WebSocket):
             data = await websocket.receive_bytes()
             offset, value = decode(data)
             set_bit(offset, value)
-            print(f'RECEIVED:\t{offset}, {value}')
-            await manager.broadcast(offset, value)
+            await manager.broadcast(data)
     except WebSocketDisconnect:
         pass
     finally:
