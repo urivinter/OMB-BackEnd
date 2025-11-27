@@ -1,4 +1,7 @@
 # main.py
+from random import randint
+
+
 from starlette.websockets import WebSocketDisconnect
 from fastapi import FastAPI, HTTPException, responses, WebSocket
 
@@ -24,12 +27,8 @@ app.add_middleware(
     allow_headers=["*"], # Allows all headers
 )
 
+SPECIAL = {randint(0, 999999): randint(0, 3) for _ in range(2000)}
 # --- API Endpoints ---
-
-# Hello world
-@app.get("/")
-async def root():
-    return {"message": "Hello World"}
 
 @app.get("/api/boxes/")
 async def get_boxes():
@@ -40,6 +39,11 @@ async def get_boxes():
     except Exception as e:
         print(e)
         return HTTPException(status_code=500, detail="Internal Server Error")
+
+@app.get("/api/special/")
+async def get_specials():
+    return SPECIAL
+
 
 @app.websocket('/ws')
 async def websocket_endpoint(websocket: WebSocket):
@@ -54,7 +58,3 @@ async def websocket_endpoint(websocket: WebSocket):
         pass
     finally:
         manager.disconnect(websocket)
-
-
-
-

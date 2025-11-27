@@ -5,6 +5,10 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections: list[WebSocket] = []
 
+    @property
+    def active_players(self) -> int:
+        return len(self.active_connections)
+
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
@@ -21,15 +25,12 @@ def decode(data: bytes) -> tuple[int, int]:
     """
     Decode 3-byte binary format to (offset, value).
     Compatible with the 23-bit offset, 1-bit value frontend scheme.
+    Scheme: metadata: 3 bits, val: 1 bit, offset: 20 bits
     """
     if len(data) != 3:
         raise ValueError(f"Error: Expected 3 bytes, got {len(data)}")
 
-    # Value is stored in the most significant bit (MSB) of the third byte.
-    value = 1 if (data[2] & 0x10) else 0
-
-    # Offset is stored in the first two bytes and the lower 7 bits of the third byte.
-    # Mask the third byte with 0x7F to exclude the value bit.
+    value = 1 if (data[0] & 0x10) else 0
     offset = data[2] | (data[1] << 8) | ((data[0] & 0x0F) << 16)
 
     return offset, value
