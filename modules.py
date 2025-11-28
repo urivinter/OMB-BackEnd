@@ -1,7 +1,14 @@
 import logfire
 from fastapi import WebSocket
 import redis
+from dotenv import load_dotenv
+import requests
 from enum import IntEnum
+import os
+
+load_dotenv()
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 class Notification(IntEnum):
     blank           = 0
@@ -21,9 +28,10 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         logfire.info(f"New player connected.", total=self.active_players, player=websocket.client.host)
+        notify_admin(f"New player connected.\nCurrently active: {self.active_players}")
         self.active_connections.append(websocket)
         data = notification(Notification.active_players, self.active_players)
-        self.broadcast(data)
+        await self.broadcast(data)
 
     def disconnect(self, websocket: WebSocket):
         try:
@@ -88,3 +96,19 @@ async def get_all():
 
 def notification(notification: Notification, value: int) -> bytes:
     return (notification << 20 | value).to_bytes(3)
+
+def notify_admin(message: str):
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        logfire.warning("Telegram bot token or chat ID not set. Skipping notification.")
+        return
+
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    try:
+        response = requests.post(url, data={
+            "chat_id": TELEGRAM_CHAT_ID,
+            "text": message,
+            "parse_mode": "HTML"
+        })
+        response.raise_for_status()  # Raise an exception for bad status codes
+    except requests.exceptions.RequestException as e:
+        logfire.error(f"Failed to send Telegram notification", error=e)

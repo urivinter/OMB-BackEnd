@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from modules import ConnectionManager, decode, set_bit, get_all
 
+
 # --- FastAPI Application Setup ---
 
 app = FastAPI()
