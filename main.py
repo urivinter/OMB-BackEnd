@@ -1,27 +1,26 @@
 # main.py
 import pickle
+import os
 
 import logfire
 from starlette.websockets import WebSocketDisconnect
 from fastapi import FastAPI, HTTPException, responses, WebSocket
 
 from fastapi.middleware.cors import CORSMiddleware
-
 from modules import ConnectionManager, decode, set_bit, get_all
 
 
 # --- FastAPI Application Setup ---
 
 app = FastAPI()
-logfire.instrument_fastapi(app)
 logfire.configure()
+logfire.instrument_fastapi(app)
 manager = ConnectionManager()
 
-# This allows frontend to communicate with backend
-origins = [
-    "http://localhost:8000",
-    "http://localhost:5173",
-]
+# Read allowed origins from an environment variable, splitting by comma
+origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:8000").split(",")
+logfire.info(f"Allowing CORS for origins: {origins}")
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -53,7 +52,7 @@ async def get_specials():
 
 @app.get("/api/active_players")
 async def get_active_players():
-    return manager.active_players
+    return await manager.get_total_active_players()
 
 
 @app.websocket('/ws')
@@ -67,7 +66,7 @@ async def websocket_endpoint(websocket: WebSocket):
             except ValueError:
                 logfire.error("Invalid data received", data=data)
                 continue
-            e = set_bit(offset, value)
+            e =  await set_bit(offset, value)
             if e is not None:
                 logfire.error(f"Error setting bit", offset=offset, value=value, error=e)
                 continue
@@ -75,6 +74,5 @@ async def websocket_endpoint(websocket: WebSocket):
             await manager.broadcast(data)
     except WebSocketDisconnect:
         pass
-    finally:
-        manager.disconnect(websocket)
-
+    finally: # The 'finally' block ensures disconnection even if an error occurs in the loop
+        await manager.disconnect(websocket)
