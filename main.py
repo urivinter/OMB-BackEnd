@@ -61,10 +61,19 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             data = await websocket.receive_bytes()
-            offset, value = decode(data)
-            set_bit(offset, value)
+            try:
+                offset, value = decode(data)
+            except ValueError:
+                logfire.error("Invalid data received", data=data)
+                continue
+            e = set_bit(offset, value)
+            if e is not None:
+                logfire.error(f"Error setting bit", offset=offset, value=value, error=e)
+                continue
+
             await manager.broadcast(data)
     except WebSocketDisconnect:
         pass
     finally:
         manager.disconnect(websocket)
+

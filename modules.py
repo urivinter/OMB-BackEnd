@@ -1,6 +1,13 @@
 import logfire
 from fastapi import WebSocket
 import redis
+from enum import IntEnum
+
+class Notification(IntEnum):
+    blank           = 0
+    active_players  = 1
+
+
 
 class ConnectionManager:
     def __init__(self):
@@ -15,23 +22,21 @@ class ConnectionManager:
         await websocket.accept()
         logfire.info(f"New player connected.", total=self.active_players, player=websocket.client.host)
         self.active_connections.append(websocket)
+        data = notification(Notification.active_players, self.active_players)
+        self.broadcast(data)
 
     def disconnect(self, websocket: WebSocket):
         try:
             self.active_connections.remove(websocket)
             logfire.info(f"Player disconnected.", total=self.active_players, player=websocket.client.host)
+            data = notification(Notification.active_players, self.active_players)
+            self.broadcast(data)
         except ValueError:
             logfire.warning(f"Attempted to disconnect a non-existent websocket: {websocket.client.host}")
 
 
     async def broadcast(self, data: bytes):
-        try:
-            offset, value = decode(data)
-        except ValueError:
-            logfire.error('Failed to decode', data=data)
-            return
 
-        logfire.info("Broadcasting data", offset=offset, value=value)
         for connection in self.active_connections:
             try:
                 await connection.send_bytes(data)
@@ -56,7 +61,7 @@ def decode(data: bytes) -> tuple[int, int]:
 
     return offset, value
 
-def set_bit(offset: int, value: int):
+def set_bit(offset: int, value: int) -> Exception | None:
     try:
         r = redis.Redis()
         pipe = r.bitfield('boxes')
@@ -64,7 +69,7 @@ def set_bit(offset: int, value: int):
         _ = pipe.execute()
         r.close()
     except Exception as e:
-        logfire.error(f"Error setting bit", offset=offset, value=value, error=e)
+        return e
 
 async def get_all():
     try:
@@ -79,3 +84,7 @@ async def get_all():
     except Exception as e:
         logfire.error(f"An unexpected error occurred in get_all", error=e)
         return e
+
+
+def notification(notification: Notification, value: int) -> bytes:
+    return (notification << 20 | value).to_bytes(3)
