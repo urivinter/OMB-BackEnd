@@ -1,9 +1,11 @@
+import logfire
 from fastapi import WebSocket
 import redis
 
 class ConnectionManager:
     def __init__(self):
         self.active_connections: list[WebSocket] = []
+        logfire.info("Connection manager initialized")
 
     @property
     def active_players(self) -> int:
@@ -11,20 +13,39 @@ class ConnectionManager:
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
+        logfire.info(f"New player connected.", total=self.active_players, player=websocket.client.host)
         self.active_connections.append(websocket)
 
     def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
+        try:
+            self.active_connections.remove(websocket)
+            logfire.info(f"Player disconnected.", total=self.active_players, player=websocket.client.host)
+        except ValueError:
+            logfire.warning(f"Attempted to disconnect a non-existent websocket: {websocket.client.host}")
+
 
     async def broadcast(self, data: bytes):
+        try:
+            offset, value = decode(data)
+        except ValueError:
+            logfire.error('Failed to decode', data=data)
+            return
+
+        logfire.info("Broadcasting data", offset=offset, value=value)
         for connection in self.active_connections:
-            await connection.send_bytes(data)
+            try:
+                await connection.send_bytes(data)
+            except Exception as e:
+                logfire.error(f"Failed to send broadcast", player=connection.client.host, error=e)
+                # maybe:
+                # self.disconnect(connection)
+        
+
 
 
 def decode(data: bytes) -> tuple[int, int]:
     """
     Decode 3-byte binary format to (offset, value).
-    Compatible with the 23-bit offset, 1-bit value frontend scheme.
     Scheme: metadata: 3 bits, val: 1 bit, offset: 20 bits
     """
     if len(data) != 3:
@@ -43,11 +64,18 @@ def set_bit(offset: int, value: int):
         _ = pipe.execute()
         r.close()
     except Exception as e:
-        print(e)
+        logfire.error(f"Error setting bit", offset=offset, value=value, error=e)
 
 async def get_all():
-    # Connect to Redis
-    r = redis.Redis(decode_responses=False)
-    res = r.get('boxes')
-    r.close()
-    return res
+    try:
+        # Connect to Redis
+        r = redis.Redis(decode_responses=False)
+        res = r.get('boxes')
+        r.close()
+        return res
+    except redis.exceptions.ConnectionError as e:
+        logfire.error(f"Redis connection error in get_all", error=e)
+        return e
+    except Exception as e:
+        logfire.error(f"An unexpected error occurred in get_all", error=e)
+        return e

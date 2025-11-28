@@ -1,7 +1,7 @@
 # main.py
-from random import randint
 import pickle
 
+import logfire
 from starlette.websockets import WebSocketDisconnect
 from fastapi import FastAPI, HTTPException, responses, WebSocket
 
@@ -12,7 +12,10 @@ from modules import ConnectionManager, decode, set_bit, get_all
 # --- FastAPI Application Setup ---
 
 app = FastAPI()
+logfire.instrument_fastapi(app)
+logfire.configure()
 manager = ConnectionManager()
+
 # This allows frontend to communicate with backend
 origins = [
     "http://localhost:8000",

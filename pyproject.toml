@@ -10,4 +10,5 @@ dependencies = [
     "redis>=7.0.1",
     "uvicorn>=0.38.0",
     "websockets>=15.0.1",
+    "logfire[fastapi]>=0.25.1",
 ]
