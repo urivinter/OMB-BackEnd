@@ -1,6 +1,6 @@
 # main.py
 from random import randint
-
+import pickle
 
 from starlette.websockets import WebSocketDisconnect
 from fastapi import FastAPI, HTTPException, responses, WebSocket
@@ -27,7 +27,10 @@ app.add_middleware(
     allow_headers=["*"], # Allows all headers
 )
 
-SPECIAL = {randint(0, 999999): randint(0, 3) for _ in range(2000)}
+with open('special.pkl', 'rb') as file:
+    SPECIAL = pickle.load(file)
+SPECIAL.update({30:0, 40:1, 50:2, 60:3})
+
 # --- API Endpoints ---
 
 @app.get("/api/boxes/")
@@ -43,6 +46,10 @@ async def get_boxes():
 @app.get("/api/special/")
 async def get_specials():
     return SPECIAL
+
+@app.get("/api/active_players")
+async def get_active_players():
+    return manager.active_players
 
 
 @app.websocket('/ws')
