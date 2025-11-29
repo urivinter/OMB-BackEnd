@@ -23,9 +23,9 @@ GLOBAL_PLAYERS_KEY = "global_active_players"
 redis_client = Redis(connection_pool=redis_pool)
 
 class Notification(IntEnum):
-    blank           = 0
-    active_players  = 1
-
+    uncheck             = 0
+    check               = 1
+    active_players      = 2
 
 
 class ConnectionManager:
@@ -98,16 +98,19 @@ class ConnectionManager:
 def decode(data: bytes) -> tuple[int, int]:
     """
     Decode 3-byte binary format to (offset, value).
-    Scheme: metadata: 3 bits, val: 1 bit, offset: 20 bits
+    Scheme: opcode: 4 bits, payload: 20 bits
     """
     if len(data) != 3:
         raise ValueError(f"Error: Expected 3 bytes, got {len(data)}")
 
-    value = 1 if (data[0] & 0x10) else 0
-    offset = data[2] | (data[1] << 8) | ((data[0] & 0x0F) << 16)
+    full_data = int.from_bytes(data, byteorder='big')
+    # The highest 4 bits determine the message type
+    message_type = full_data >> 20
 
-    return offset, value
+    # The lower 20 bits are the payload (e.g., offset or player count)
+    payload = full_data & 0xFFFFF  # 0xFFFFF is a mask for the lower 20 bits
 
+    return payload, message_type
 
 async def set_bit(offset: int, value: int) -> Exception | None:
     try:
@@ -130,7 +133,9 @@ async def get_all():
 
 
 def notification(notification: Notification, value: int) -> bytes:
-    return ((notification << 21) | value).to_bytes(3)
+    # Encode the notification using a 20-bit shift to be consistent with the decode function.
+    # This places the notification type in the top 4 bits, and the value becomes the payload.
+    return ((notification << 20) | value).to_bytes(3)
 
 async def notify_admin(message: str):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:

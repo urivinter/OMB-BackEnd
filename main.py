@@ -1,18 +1,26 @@
 # main.py
 import pickle
 import os
+from contextlib import asynccontextmanager
 
 import logfire
 from starlette.websockets import WebSocketDisconnect
 from fastapi import FastAPI, HTTPException, responses, WebSocket
 
 from fastapi.middleware.cors import CORSMiddleware
-from modules import ConnectionManager, decode, set_bit, get_all
+from modules import ConnectionManager, decode, set_bit, get_all, Notification, redis_client, GLOBAL_PLAYERS_KEY
 
 
 # --- FastAPI Application Setup ---
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Reset the global player count on application startup to prevent stale data
+    await redis_client.set(GLOBAL_PLAYERS_KEY, 0)
+    logfire.info("Global player count reset to 0 on startup.")
+    yield
+
+app = FastAPI(lifespan=lifespan)
 logfire.configure()
 logfire.instrument_fastapi(app)
 manager = ConnectionManager()
@@ -32,7 +40,6 @@ app.add_middleware(
 
 with open('special.pkl', 'rb') as file:
     SPECIAL = pickle.load(file)
-SPECIAL.update({30:0, 40:1, 50:2, 60:3})
 
 # --- API Endpoints ---
 
@@ -43,7 +50,7 @@ async def get_boxes():
         return responses.Response(res, media_type="application/octet-stream")
 
     except Exception as e:
-        print(e)
+        logfire.error("Failed to get boxes data", exc_info=e)
         return HTTPException(status_code=500, detail="Internal Server Error")
 
 @app.get("/api/special/")
@@ -66,6 +73,10 @@ async def websocket_endpoint(websocket: WebSocket):
             except ValueError:
                 logfire.error("Invalid data received", data=data)
                 continue
+            if value > 1:
+                print("got pubsub transition")
+                continue
+
             e =  await set_bit(offset, value)
             if e is not None:
                 logfire.error(f"Error setting bit", offset=offset, value=value, error=e)
