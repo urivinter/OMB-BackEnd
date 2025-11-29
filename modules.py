@@ -76,13 +76,12 @@ class ConnectionManager:
 
     async def broadcast(self, data: bytes):
         """Publishes a message to the Redis channel for all workers to receive."""
-        r = Redis(connection_pool=redis_pool)
-        await r.publish(BROADCAST_CHANNEL, data)
+        await redis_client.publish(BROADCAST_CHANNEL, data)
 
     async def _redis_listener(self, websocket: WebSocket):
         """Listens for messages on the Redis channel and sends them to a single websocket."""
-        r = Redis(connection_pool=redis_pool)
-        async with r.pubsub() as pubsub:
+        # Use a separate client for pubsub to avoid conflicts with other commands
+        async with redis_client.pubsub() as pubsub:
             await pubsub.subscribe(BROADCAST_CHANNEL)
             while True:
                 try:

@@ -1,0 +1,8 @@
+# /home/uri-home-x1/PycharmProjects/OMCB/back/.dockerignore
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.idea/
+.pytest_cache/
