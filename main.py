@@ -43,6 +43,10 @@ with open('special.pkl', 'rb') as file:
 
 # --- API Endpoints ---
 
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
 @app.get("/api/boxes/")
 async def get_boxes():
     try:
@@ -69,14 +73,16 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             data = await websocket.receive_bytes()
             try:
-                offset, value = decode(data)
+                payload, msg_type = decode(data)
             except ValueError:
                 logfire.error("Invalid data received", data=data)
                 continue
-            if value > 1:
-                print("got pubsub transition")
+
+            # Explicitly ignore messages that are server-sent notifications
+            if msg_type >= Notification.active_players:
                 continue
 
+            offset, value = payload, msg_type
             e =  await set_bit(offset, value)
             if e is not None:
                 logfire.error(f"Error setting bit", offset=offset, value=value, error=e)
