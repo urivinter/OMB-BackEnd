@@ -21,8 +21,19 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan)
-logfire.configure()
-logfire.instrument_fastapi(app)
+
+# --- SAFE LOGFIRE SETUP ---
+# Only configure Logfire if the token is present in env vars
+if os.getenv("LOGFIRE_TOKEN"):
+    try:
+        logfire.configure()
+        logfire.instrument_fastapi(app)
+        print("Logfire configured successfully.")
+    except Exception as e:
+        print(f"Failed to configure Logfire: {e}")
+else:
+    print("LOGFIRE_TOKEN not found. Skipping observability setup.")
+
 manager = ConnectionManager()
 
 # Read allowed origins from an environment variable, splitting by comma

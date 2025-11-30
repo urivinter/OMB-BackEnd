@@ -6,3 +6,16 @@ __pycache__/
 .env
 .idea/
 .pytest_cache/
+.git
+.gitignore
+.venv
+venv
+*.egg-info
+.mypy_cache
+pycache
+.logfire
+.python-version
+README.md
+uv.lock
+pyproject.toml
+
