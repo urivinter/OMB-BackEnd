@@ -45,7 +45,7 @@ class ConnectionManager:
         total_players = await redis_client.incr(GLOBAL_PLAYERS_KEY)
 
         await notify_admin(f"New player connected.\nCurrently active: {total_players}")
-        logfire.info(f"New player connected.", total=total_players, player=websocket.client.host)
+        logfire.info(f"New player connected.", total=total_players, player=get_client_ip(websocket))
 
         # Create a listener task for this specific websocket
         listener_task = asyncio.create_task(self._redis_listener(websocket))
@@ -63,7 +63,7 @@ class ConnectionManager:
 
             # Atomically decrement the global player count and get the new total
             total_players = await redis_client.decr(GLOBAL_PLAYERS_KEY)
-            logfire.info(f"Player disconnected.", total=total_players, player=websocket.client.host)
+            logfire.info(f"Player disconnected.", total=total_players, player=get_client_ip(websocket))
 
             # Notify remaining players about the updated count via Redis Pub/Sub
             data = notification(Notification.active_players, total_players)
@@ -153,3 +153,18 @@ async def notify_admin(message: str):
             response.raise_for_status()  # Raise an exception for bad status codes
         except httpx.RequestError as e:
             logfire.error(f"Failed to send Telegram notification", error=e)
+
+def get_client_ip(websocket):
+    # Try X-Forwarded-For first (standard header)
+    forwarded_for = websocket.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        # X-Forwarded-For can contain multiple IPs, first one is the client
+        return forwarded_for.split(",")[0].strip()
+
+    # Try X-Real-IP as fallback
+    real_ip = websocket.headers.get("X-Real-IP")
+    if real_ip:
+        return real_ip
+
+    # Last resort: use the direct connection (will be nginx IP)
+    return websocket.client.host

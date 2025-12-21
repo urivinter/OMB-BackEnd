@@ -11,3 +11,11 @@ wheels/
 .venv
 
 .env
+
+*.sh
+.dockerignore
+CLAUDE.md
+Dockerfile
+trust-policy.json
+user-data.sh
+Dockerrun.aws.json

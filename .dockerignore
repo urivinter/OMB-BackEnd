@@ -16,6 +16,7 @@ pycache
 .logfire
 .python-version
 README.md
+CLAUDE.md
 uv.lock
 pyproject.toml
 
