@@ -88,4 +88,4 @@ jobs:
         run: |
           echo "✅ Backend deployed successfully!"
           echo "🐳 Docker image pushed to ECR"
-        echo "🚀 Container restarted on EC2"
+          echo "🚀 Container restarted on EC2"
