@@ -89,15 +89,13 @@ async def websocket_endpoint(websocket: WebSocket):
                 logfire.error("Invalid data received", data=data)
                 continue
 
-            # Explicitly ignore messages that are server-sent notifications
-            if msg_type >= Notification.active_players:
-                continue
-
-            offset, value = payload, msg_type
-            e =  await set_bit(offset, value)
-            if e is not None:
-                logfire.error(f"Error setting bit", offset=offset, value=value, error=e)
-                continue
+            # Set redis bit for check/uncheck messages
+            if msg_type in [Notification.check, Notification.uncheck]:
+                offset, value = payload, msg_type
+                e =  await set_bit(offset, value)
+                if e is not None:
+                    logfire.error(f"Error setting bit", offset=offset, value=value, error=e)
+                    continue
 
             await manager.broadcast(data)
     except WebSocketDisconnect:
